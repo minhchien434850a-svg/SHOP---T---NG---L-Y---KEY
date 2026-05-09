@@ -496,7 +496,63 @@ def callback(call):
                 call.message.chat.id,
                 "❌ CHƯA THANH TOÁN"
             )
+# =========================================
+# SET LINK
+# =========================================
 
+@bot.message_handler(commands=['setlink'])
+def setlink(message):
+
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    try:
+
+        split_text = message.text.split()
+
+        product_code = split_text[1]
+
+        device = split_text[2]
+
+        version = split_text[3]
+
+        time_name = split_text[4]
+
+        link = split_text[5]
+
+        full_package = f"{device}_{version}_{time_name}"
+
+        cursor.execute("""
+        DELETE FROM links
+        WHERE product_code=?
+        AND package=?
+        """, (
+            product_code,
+            full_package
+        ))
+
+        cursor.execute("""
+        INSERT INTO links
+        VALUES (?, ?, ?)
+        """, (
+            product_code,
+            full_package,
+            link
+        ))
+
+        conn.commit()
+
+        bot.reply_to(
+            message,
+            "✅ ĐÃ THÊM LINK"
+        )
+
+    except:
+
+        bot.reply_to(
+            message,
+            "❌ /setlink game device version time link"
+        )
 # =========================================
 # ADD PRODUCT
 # =========================================
