@@ -16,6 +16,7 @@ import random
 import string
 import requests
 import time
+import os
 
 # =========================================================
 # CONFIG
@@ -1012,7 +1013,14 @@ threading.Thread(
     target=auto_check_payment
 ).start()
 
+PORT = int(
+    os.environ.get(
+        "PORT",
+        3000
+    )
+)
+
 app.run(
     host="0.0.0.0",
-    port=3000
+    port=PORT
 )
