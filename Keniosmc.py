@@ -1,3 +1,6 @@
+# REQUIRE:
+# pip install pytelegrambotapi flask requests
+
 from flask import Flask
 from telebot import TeleBot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -93,6 +96,16 @@ CREATE TABLE IF NOT EXISTS keys_data(
 )
 """)
 
+# LINKS
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS links(
+    product_code TEXT,
+    package TEXT,
+    link TEXT
+)
+""")
+
 # ORDERS
 
 cursor.execute("""
@@ -137,11 +150,10 @@ def start(message):
     bot.send_message(
         message.chat.id,
         """
-🎮 SHOP TOOL
+🛒 DIGITAL SHOP
 
-💰 THANH TOÁN TỰ ĐỘNG
+💳 THANH TOÁN QR
 🔑 GIAO KEY TỰ ĐỘNG
-📱 IOS / ANDROID
 """,
         reply_markup=markup
     )
@@ -155,9 +167,7 @@ def callback(call):
 
     data = call.data
 
-    # =====================================
     # PRODUCT
-    # =====================================
 
     if data.startswith("product_"):
 
@@ -193,9 +203,7 @@ def callback(call):
             reply_markup=markup
         )
 
-    # =====================================
     # DEVICE
-    # =====================================
 
     elif data.startswith("device_"):
 
@@ -236,9 +244,7 @@ def callback(call):
             reply_markup=markup
         )
 
-    # =====================================
     # VERSION
-    # =====================================
 
     elif data.startswith("version_"):
 
@@ -292,9 +298,7 @@ def callback(call):
             reply_markup=markup
         )
 
-    # =====================================
     # BUY
-    # =====================================
 
     elif data.startswith("buy_"):
 
@@ -369,11 +373,11 @@ def callback(call):
             call.message.chat.id,
             qr_url,
             caption=f"""
-🎮 GAME: {product_code.upper()}
+📦 SẢN PHẨM: {product_code.upper()}
 
 📱 HỆ: {device.upper()}
 
-📦 GÓI: {version.upper()}
+🎁 GÓI: {version.upper()}
 
 ⏰ THỜI GIAN: {time_name.upper()}
 
@@ -391,9 +395,7 @@ def callback(call):
             reply_markup=markup
         )
 
-    # =====================================
     # CHECK PAYMENT
-    # =====================================
 
     elif data.startswith("check_"):
 
@@ -443,6 +445,8 @@ def callback(call):
 
                 package = order[3]
 
+                # GET KEY
+
                 cursor.execute("""
                 SELECT id, key_value
                 FROM keys_data
@@ -469,7 +473,7 @@ def callback(call):
 
                 key_value = key_data[1]
 
-                # XOÁ KEY SAU KHI BÁN
+                # DELETE SOLD KEY
 
                 cursor.execute("""
                 DELETE FROM keys_data
@@ -478,6 +482,25 @@ def callback(call):
 
                 conn.commit()
 
+                # GET LINK
+
+                cursor.execute("""
+                SELECT link
+                FROM links
+                WHERE product_code=?
+                AND package=?
+                """, (
+                    product_code,
+                    package
+                ))
+
+                link_data = cursor.fetchone()
+
+                download_link = "Không có link"
+
+                if link_data:
+                    download_link = link_data[0]
+
                 bot.send_message(
                     call.message.chat.id,
                     f"""
@@ -485,6 +508,9 @@ def callback(call):
 
 🔑 KEY:
 {key_value}
+
+🔗 LINK TẢI:
+{download_link}
 """
                 )
 
@@ -496,6 +522,242 @@ def callback(call):
                 call.message.chat.id,
                 "❌ CHƯA THANH TOÁN"
             )
+
+# =========================================
+# ADD PRODUCT
+# =========================================
+
+@bot.message_handler(commands=['addproduct'])
+def addproduct(message):
+
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    try:
+
+        split_text = message.text.split()
+
+        product_code = split_text[1]
+
+        display_name = split_text[2]
+
+        cursor.execute("""
+        INSERT INTO products
+        VALUES (?, ?, ?)
+        """, (
+            product_code,
+            display_name,
+            1
+        ))
+
+        conn.commit()
+
+        bot.reply_to(
+            message,
+            "✅ ĐÃ THÊM GAME"
+        )
+
+    except:
+
+        bot.reply_to(
+            message,
+            "❌ /addproduct code ten"
+        )
+
+# =========================================
+# ADD DEVICE
+# =========================================
+
+@bot.message_handler(commands=['adddevice'])
+def adddevice(message):
+
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    try:
+
+        split_text = message.text.split()
+
+        product_code = split_text[1]
+
+        device = split_text[2]
+
+        cursor.execute("""
+        INSERT INTO devices
+        VALUES (?, ?)
+        """, (
+            product_code,
+            device
+        ))
+
+        conn.commit()
+
+        bot.reply_to(
+            message,
+            "✅ ĐÃ THÊM HỆ"
+        )
+
+    except:
+
+        bot.reply_to(
+            message,
+            "❌ /adddevice game device"
+        )
+
+# =========================================
+# ADD VERSION
+# =========================================
+
+@bot.message_handler(commands=['addversion'])
+def addversion(message):
+
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    try:
+
+        split_text = message.text.split()
+
+        product_code = split_text[1]
+
+        device = split_text[2]
+
+        version = split_text[3]
+
+        cursor.execute("""
+        INSERT INTO versions
+        VALUES (?, ?, ?)
+        """, (
+            product_code,
+            device,
+            version
+        ))
+
+        conn.commit()
+
+        bot.reply_to(
+            message,
+            "✅ ĐÃ THÊM GÓI"
+        )
+
+    except:
+
+        bot.reply_to(
+            message,
+            "❌ /addversion game device version"
+        )
+
+# =========================================
+# SET PRICE
+# =========================================
+
+@bot.message_handler(commands=['setprice'])
+def setprice(message):
+
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    try:
+
+        split_text = message.text.split()
+
+        product_code = split_text[1]
+
+        device = split_text[2]
+
+        version = split_text[3]
+
+        time_name = split_text[4]
+
+        price = int(split_text[5])
+
+        full_package = f"{device}_{version}_{time_name}"
+
+        cursor.execute("""
+        DELETE FROM prices
+        WHERE product_code=?
+        AND package=?
+        """, (
+            product_code,
+            full_package
+        ))
+
+        cursor.execute("""
+        INSERT INTO prices
+        VALUES (?, ?, ?)
+        """, (
+            product_code,
+            full_package,
+            price
+        ))
+
+        conn.commit()
+
+        bot.reply_to(
+            message,
+            "✅ ĐÃ SET GIÁ"
+        )
+
+    except:
+
+        bot.reply_to(
+            message,
+            "❌ /setprice game device version time gia"
+        )
+
+# =========================================
+# ADD KEY
+# =========================================
+
+@bot.message_handler(commands=['addkey'])
+def addkey(message):
+
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    try:
+
+        split_text = message.text.split()
+
+        product_code = split_text[1]
+
+        device = split_text[2]
+
+        version = split_text[3]
+
+        time_name = split_text[4]
+
+        key_value = split_text[5]
+
+        full_package = f"{device}_{version}_{time_name}"
+
+        cursor.execute("""
+        INSERT INTO keys_data(
+            product_code,
+            package,
+            key_value
+        )
+        VALUES (?, ?, ?)
+        """, (
+            product_code,
+            full_package,
+            key_value
+        ))
+
+        conn.commit()
+
+        bot.reply_to(
+            message,
+            "✅ ĐÃ THÊM KEY"
+        )
+
+    except:
+
+        bot.reply_to(
+            message,
+            "❌ /addkey game device version time key"
+        )
+
 # =========================================
 # SET LINK
 # =========================================
@@ -553,225 +815,6 @@ def setlink(message):
             message,
             "❌ /setlink game device version time link"
         )
-# =========================================
-# ADD PRODUCT
-# =========================================
-
-@bot.message_handler(commands=['addproduct'])
-def addproduct(message):
-
-    if message.from_user.id != ADMIN_ID:
-        return
-
-    try:
-
-        split_text = message.text.split()
-
-        product_code = split_text[1]
-
-        display_name = split_text[2]
-
-        cursor.execute("""
-        INSERT INTO products
-        VALUES (?, ?, ?)
-        """, (
-            product_code,
-            display_name,
-            1
-        ))
-
-        conn.commit()
-
-        bot.reply_to(message, "✅ ĐÃ THÊM GAME")
-
-    except:
-
-        bot.reply_to(
-            message,
-            "❌ /addproduct code ten"
-        )
-
-# =========================================
-# ADD DEVICE
-# =========================================
-
-@bot.message_handler(commands=['adddevice'])
-def adddevice(message):
-
-    if message.from_user.id != ADMIN_ID:
-        return
-
-    try:
-
-        split_text = message.text.split()
-
-        product_code = split_text[1]
-
-        device = split_text[2]
-
-        cursor.execute("""
-        INSERT INTO devices
-        VALUES (?, ?)
-        """, (
-            product_code,
-            device
-        ))
-
-        conn.commit()
-
-        bot.reply_to(message, "✅ ĐÃ THÊM HỆ")
-
-    except:
-
-        bot.reply_to(
-            message,
-            "❌ /adddevice game device"
-        )
-
-# =========================================
-# ADD VERSION
-# =========================================
-
-@bot.message_handler(commands=['addversion'])
-def addversion(message):
-
-    if message.from_user.id != ADMIN_ID:
-        return
-
-    try:
-
-        split_text = message.text.split()
-
-        product_code = split_text[1]
-
-        device = split_text[2]
-
-        version = split_text[3]
-
-        cursor.execute("""
-        INSERT INTO versions
-        VALUES (?, ?, ?)
-        """, (
-            product_code,
-            device,
-            version
-        ))
-
-        conn.commit()
-
-        bot.reply_to(message, "✅ ĐÃ THÊM GÓI")
-
-    except:
-
-        bot.reply_to(
-            message,
-            "❌ /addversion game device version"
-        )
-
-# =========================================
-# SET PRICE
-# =========================================
-
-@bot.message_handler(commands=['setprice'])
-def setprice(message):
-
-    if message.from_user.id != ADMIN_ID:
-        return
-
-    try:
-
-        split_text = message.text.split()
-
-        product_code = split_text[1]
-
-        device = split_text[2]
-
-        version = split_text[3]
-
-        time_name = split_text[4]
-
-        price = int(split_text[5])
-
-        full_package = f"{device}_{version}_{time_name}"
-
-        cursor.execute("""
-        DELETE FROM prices
-        WHERE product_code=?
-        AND package=?
-        """, (
-            product_code,
-            full_package
-        ))
-
-        cursor.execute("""
-        INSERT INTO prices
-        VALUES (?, ?, ?)
-        """, (
-            product_code,
-            full_package,
-            price
-        ))
-
-        conn.commit()
-
-        bot.reply_to(message, "✅ ĐÃ SET GIÁ")
-
-    except:
-
-        bot.reply_to(
-            message,
-            "❌ /setprice game device version time gia"
-        )
-
-# =========================================
-# ADD KEY
-# =========================================
-
-@bot.message_handler(commands=['addkey'])
-def addkey(message):
-
-    if message.from_user.id != ADMIN_ID:
-        return
-
-    try:
-
-        split_text = message.text.split()
-
-        product_code = split_text[1]
-
-        device = split_text[2]
-
-        version = split_text[3]
-
-        time_name = split_text[4]
-
-        key_value = split_text[5]
-
-        full_package = f"{device}_{version}_{time_name}"
-
-        cursor.execute("""
-        INSERT INTO keys_data(
-            product_code,
-            package,
-            key_value
-        )
-        VALUES (?, ?, ?)
-        """, (
-            product_code,
-            full_package,
-            key_value
-        ))
-
-        conn.commit()
-
-        bot.reply_to(message, "✅ ĐÃ THÊM KEY")
-
-    except:
-
-        bot.reply_to(
-            message,
-            "❌ /addkey game device version time key"
-        )
 
 # =========================================
 # RENAME VERSION
@@ -802,7 +845,10 @@ def renameversion(message):
 
         conn.commit()
 
-        bot.reply_to(message, "✅ ĐÃ ĐỔI TÊN GÓI")
+        bot.reply_to(
+            message,
+            "✅ ĐÃ ĐỔI TÊN GÓI"
+        )
 
     except:
 
@@ -827,18 +873,10 @@ def delversion(message):
 
         version = split_text[1].lower()
 
-        # =====================================
-        # XOÁ TRONG versions
-        # =====================================
-
         cursor.execute("""
         DELETE FROM versions
         WHERE LOWER(version)=?
         """, (version,))
-
-        # =====================================
-        # XOÁ TRONG prices
-        # =====================================
 
         cursor.execute("""
         DELETE FROM prices
@@ -847,10 +885,6 @@ def delversion(message):
             f"%_{version}_%",
         ))
 
-        # =====================================
-        # XOÁ TRONG keys_data
-        # =====================================
-
         cursor.execute("""
         DELETE FROM keys_data
         WHERE LOWER(package) LIKE ?
@@ -858,12 +892,8 @@ def delversion(message):
             f"%_{version}_%",
         ))
 
-        # =====================================
-        # XOÁ TRONG orders
-        # =====================================
-
         cursor.execute("""
-        DELETE FROM orders
+        DELETE FROM links
         WHERE LOWER(package) LIKE ?
         """, (
             f"%_{version}_%",
@@ -873,7 +903,7 @@ def delversion(message):
 
         bot.reply_to(
             message,
-            f"✅ ĐÃ XOÁ GÓI: {version}"
+            "✅ ĐÃ XOÁ GÓI"
         )
 
     except Exception as e:
