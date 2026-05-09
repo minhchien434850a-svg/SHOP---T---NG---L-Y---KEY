@@ -192,7 +192,7 @@ def callback(call):
             reply_markup=markup
         )
 
-    # =====================================
+        # =====================================
     # BUY
     # =====================================
 
@@ -248,26 +248,25 @@ def callback(call):
 
         conn.commit()
 
-        headers = {
-            "Authorization": f"Bearer {SEPAY_API_KEY}"
-        }
+        # =========================
+        # THÔNG TIN NGÂN HÀNG
+        # =========================
 
-        response = requests.get(
-            "https://my.sepay.vn/userapi/bankaccounts/list",
-            headers=headers
-        )
+        bank_name = "MSB"
 
-        data_bank = response.json()
+        account_number = "80003122324"
 
-        bank = data_bank["data"][0]
+        account_holder = "TRAN MINH CHIEN"
 
-        bank_name = bank["bank_name"]
+        # =========================
+        # QR CODE
+        # =========================
 
-        account_number = bank["account_number"]
+        qr_url = f"https://qr.sepay.vn/img?acc={account_number}&bank=MSB&amount={amount}&des={payment_code}"
 
-        account_holder = bank[
-            "account_holder_name"
-        ]
+        # =========================
+        # TEXT
+        # =========================
 
         text = f"""
 💰 SẢN PHẨM:
@@ -279,7 +278,7 @@ def callback(call):
 💵 GIÁ:
 {amount:,}đ
 
-🏦 BANK:
+🏦 NGÂN HÀNG:
 {bank_name}
 
 👤 CHỦ TK:
@@ -291,12 +290,17 @@ def callback(call):
 📌 NỘI DUNG:
 {payment_code}
 
-⚠️ BOT TỰ ĐỘNG GIAO KEY
+⚠️ QUÉT QR ĐỂ THANH TOÁN
 """
 
-        bot.send_message(
+        # =========================
+        # GỬI QR
+        # =========================
+
+        bot.send_photo(
             call.message.chat.id,
-            text
+            qr_url,
+            caption=text
         )
 
 # =========================================
