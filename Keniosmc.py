@@ -1,26 +1,21 @@
-# =========================================================
 # REQUIRE:
 # pip install pytelegrambotapi flask requests
-# =========================================================
 
 from flask import Flask
 from telebot import TeleBot
-from telebot.types import (
-    InlineKeyboardMarkup,
-    InlineKeyboardButton
-)
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 import sqlite3
 import threading
 import random
 import string
 import requests
-import time
 import os
+import time
 
-# =========================================================
+# =========================================
 # CONFIG
-# =========================================================
+# =========================================
 
 BOT_TOKEN = "8664092084:AAHQdWBZQCp-RDRvgqt4eX9ODSXtE8kVF24"
 
@@ -36,17 +31,17 @@ BANK_OWNER = "TRAN MINH CHIEN"
 
 CHECK_TIME = 10
 
-# =========================================================
-# BOT + FLASK
-# =========================================================
+# =========================================
+# BOT
+# =========================================
 
 bot = TeleBot(BOT_TOKEN)
 
 app = Flask(__name__)
 
-# =========================================================
+# =========================================
 # DATABASE
-# =========================================================
+# =========================================
 
 conn = sqlite3.connect(
     "shop.db",
@@ -130,167 +125,9 @@ CREATE TABLE IF NOT EXISTS orders(
 
 conn.commit()
 
-# =========================================================
-# FUNCTIONS
-# =========================================================
-
-def create_payment_code():
-
-    return "PAY" + ''.join(
-        random.choices(
-            string.digits,
-            k=6
-        )
-    )
-
-
-def get_key(product_code, package):
-
-    cursor.execute("""
-    SELECT id, key_value
-    FROM keys_data
-    WHERE product_code=?
-    AND package=?
-    LIMIT 1
-    """, (
-        product_code,
-        package
-    ))
-
-    result = cursor.fetchone()
-
-    if not result:
-        return None
-
-    key_id = result[0]
-
-    key_value = result[1]
-
-    cursor.execute("""
-    DELETE FROM keys_data
-    WHERE id=?
-    """, (key_id,))
-
-    conn.commit()
-
-    return key_value
-
-
-def get_link(product_code, package):
-
-    cursor.execute("""
-    SELECT link
-    FROM links
-    WHERE product_code=?
-    AND package=?
-    """, (
-        product_code,
-        package
-    ))
-
-    result = cursor.fetchone()
-
-    if result:
-        return result[0]
-
-    return None
-
-
-def payment_success(payment_code):
-
-    cursor.execute("""
-    SELECT *
-    FROM orders
-    WHERE payment_code=?
-    """, (payment_code,))
-
-    order = cursor.fetchone()
-
-    if not order:
-        return
-
-    if order[5] == "paid":
-        return
-
-    chat_id = order[1]
-
-    product_code = order[2]
-
-    package = order[3]
-
-    amount = order[4]
-
-    cursor.execute("""
-    UPDATE orders
-    SET status='paid'
-    WHERE payment_code=?
-    """, (payment_code,))
-
-    conn.commit()
-
-    key_data = get_key(
-        product_code,
-        package
-    )
-
-    download_link = get_link(
-        product_code,
-        package
-    )
-
-    text = f"""
-✅ THANH TOÁN THÀNH CÔNG
-
-📦 SẢN PHẨM:
-{product_code.upper()}
-
-💰 SỐ TIỀN:
-{amount:,}đ
-
-📌 MÃ ĐƠN:
-{payment_code}
-"""
-
-    if key_data:
-
-        text += f"""
-
-🔑 KEY:
-{key_data}
-"""
-
-    if download_link:
-
-        text += f"""
-
-📥 LINK TẢI:
-{download_link}
-"""
-
-    bot.send_message(
-        chat_id,
-        text
-    )
-
-    bot.send_message(
-        ADMIN_ID,
-        f"""
-💸 CÓ THANH TOÁN MỚI
-
-👤 USER:
-{chat_id}
-
-📦 PRODUCT:
-{product_code}
-
-💰:
-{amount:,}đ
-"""
-    )
-
-# =========================================================
+# =========================================
 # START
-# =========================================================
+# =========================================
 
 @bot.message_handler(commands=['start'])
 def start(message):
@@ -304,15 +141,6 @@ def start(message):
     """)
 
     products = cursor.fetchall()
-
-    if not products:
-
-        bot.send_message(
-            message.chat.id,
-            "❌ CHƯA CÓ SẢN PHẨM"
-        )
-
-        return
 
     for product in products:
 
@@ -330,14 +158,14 @@ def start(message):
 
 💳 THANH TOÁN QR
 🔑 GIAO KEY TỰ ĐỘNG
-📥 GIAO FILE TỰ ĐỘNG
+📦 TẢI FILE TỰ ĐỘNG
 """,
         reply_markup=markup
     )
 
-# =========================================================
+# =========================================
 # CALLBACK
-# =========================================================
+# =========================================
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback(call):
@@ -514,7 +342,12 @@ def callback(call):
 
         amount = result[0]
 
-        payment_code = create_payment_code()
+        payment_code = "PAY" + ''.join(
+            random.choices(
+                string.digits,
+                k=6
+            )
+        )
 
         cursor.execute("""
         INSERT INTO orders
@@ -530,13 +363,7 @@ def callback(call):
 
         conn.commit()
 
-        qr_url = (
-            f"https://img.vietqr.io/image/"
-            f"{BANK_NAME}-{BANK_NUMBER}-compact2.png"
-            f"?amount={amount}"
-            f"&addInfo={payment_code}"
-            f"&accountName={BANK_OWNER}"
-        )
+        qr_url = f"https://img.vietqr.io/image/{BANK_NAME}-{BANK_NUMBER}-compact2.png?amount={amount}&addInfo={payment_code}&accountName={BANK_OWNER}"
 
         markup = InlineKeyboardMarkup()
 
@@ -551,29 +378,21 @@ def callback(call):
             call.message.chat.id,
             qr_url,
             caption=f"""
-📦 SẢN PHẨM:
-{product_code.upper()}
+📦 SẢN PHẨM: {product_code.upper()}
 
-📱 HỆ:
-{device.upper()}
+📱 HỆ: {device.upper()}
 
-🎁 GÓI:
-{version.upper()}
+🎁 GÓI: {version.upper()}
 
-⏰ THỜI GIAN:
-{time_name.upper()}
+⏰ THỜI GIAN: {time_name.upper()}
 
-💰 GIÁ:
-{amount:,}đ
+💰 GIÁ: {amount:,}đ
 
-🏦 BANK:
-{BANK_NAME}
+🏦 BANK: {BANK_NAME}
 
-💳 STK:
-{BANK_NUMBER}
+💳 STK: {BANK_NUMBER}
 
-👤 CHỦ TK:
-{BANK_OWNER}
+👤 CHỦ TK: {BANK_OWNER}
 
 📌 NỘI DUNG:
 {payment_code}
@@ -590,54 +409,43 @@ def callback(call):
             ""
         )
 
-        try:
+        check_payment(
+            payment_code,
+            call.message.chat.id
+        )
 
-            headers = {
-                "Authorization": f"Bearer {SEPAY_API_KEY}"
-            }
+# =========================================
+# CHECK PAYMENT FUNCTION
+# =========================================
 
-            response = requests.get(
-                "https://my.sepay.vn/userapi/transactions/list?limit=20",
-                headers=headers,
-                timeout=20
+def check_payment(payment_code, chat_id):
+
+    headers = {
+        "Authorization": f"Bearer {SEPAY_API_KEY}"
+    }
+
+    try:
+
+        response = requests.get(
+            "https://my.sepay.vn/userapi/transactions/list",
+            headers=headers
+        )
+
+        data_json = response.json()
+
+        for trans in data_json["data"]:
+
+            content = str(
+                trans.get(
+                    "transaction_content",
+                    ""
+                )
             )
 
-            if response.status_code != 200:
-
-                bot.answer_callback_query(
-                    call.id,
-                    "❌ API ERROR"
-                )
-
-                return
-
-            data_json = response.json()
-
-            transactions = data_json.get(
-                "transactions",
-                []
-            )
-
-            paid = False
-
-            for trans in transactions:
-
-                content = str(
-                    trans.get(
-                        "transaction_content",
-                        ""
-                    )
-                ).strip()
-
-                amount_in = int(
-                    trans.get(
-                        "amount_in",
-                        0
-                    )
-                )
+            if payment_code in content:
 
                 cursor.execute("""
-                SELECT amount, status
+                SELECT *
                 FROM orders
                 WHERE payment_code=?
                 """, (payment_code,))
@@ -645,160 +453,181 @@ def callback(call):
                 order = cursor.fetchone()
 
                 if not order:
-                    break
+                    return
 
-                order_amount = order[0]
+                if order[5] == "paid":
+                    return
 
-                order_status = order[1]
+                amount = order[4]
 
-                if order_status == "paid":
+                money = int(
+                    trans.get(
+                        "amount_in",
+                        0
+                    )
+                )
 
-                    bot.answer_callback_query(
-                        call.id,
-                        "✅ ĐÃ THANH TOÁN"
+                if money < amount:
+
+                    bot.send_message(
+                        chat_id,
+                        "❌ THANH TOÁN THIẾU TIỀN"
                     )
 
                     return
 
-                if (
-                    payment_code in content
-                    and amount_in >= order_amount
-                ):
+                product_code = order[2]
 
-                    payment_success(payment_code)
+                package = order[3]
 
-                    bot.answer_callback_query(
-                        call.id,
-                        "✅ THANH TOÁN THÀNH CÔNG"
+                cursor.execute("""
+                SELECT id, key_value
+                FROM keys_data
+                WHERE product_code=?
+                AND package=?
+                LIMIT 1
+                """, (
+                    product_code,
+                    package
+                ))
+
+                key_data = cursor.fetchone()
+
+                if not key_data:
+
+                    bot.send_message(
+                        chat_id,
+                        "❌ HẾT KEY"
                     )
 
-                    paid = True
+                    return
 
-                    break
+                key_id = key_data[0]
 
-            if not paid:
+                key_value = key_data[1]
 
-                bot.answer_callback_query(
-                    call.id,
-                    "❌ CHƯA THANH TOÁN"
+                # DELETE SOLD KEY
+
+                cursor.execute("""
+                DELETE FROM keys_data
+                WHERE id=?
+                """, (key_id,))
+
+                # UPDATE ORDER
+
+                cursor.execute("""
+                UPDATE orders
+                SET status='paid'
+                WHERE payment_code=?
+                """, (payment_code,))
+
+                conn.commit()
+
+                # GET LINK
+
+                cursor.execute("""
+                SELECT link
+                FROM links
+                WHERE product_code=?
+                AND package=?
+                """, (
+                    product_code,
+                    package
+                ))
+
+                link_data = cursor.fetchone()
+
+                download_link = "Không có link"
+
+                if link_data:
+                    download_link = link_data[0]
+
+                bot.send_message(
+                    chat_id,
+                    f"""
+✅ THANH TOÁN THÀNH CÔNG
+
+🔑 KEY:
+{key_value}
+
+🔗 LINK:
+{download_link}
+"""
                 )
 
-        except Exception as e:
+                return
 
-            print(e)
-
-            bot.answer_callback_query(
-                call.id,
-                "❌ LỖI CHECK"
-            )
-
-# =========================================================
-# ADMIN COMMAND
-# =========================================================
-
-@bot.message_handler(commands=['addproduct'])
-def add_product(message):
-
-    if message.chat.id != ADMIN_ID:
-        return
-
-    try:
-
-        split_data = message.text.split("|")
-
-        product_code = split_data[1]
-
-        display_name = split_data[2]
-
-        cursor.execute("""
-        INSERT INTO products
-        VALUES (?, ?, ?)
-        """, (
-            product_code,
-            display_name,
-            1
-        ))
-
-        conn.commit()
-
-        bot.reply_to(
-            message,
-            "✅ ĐÃ THÊM PRODUCT"
+        bot.send_message(
+            chat_id,
+            "❌ CHƯA THANH TOÁN"
         )
 
-    except:
+    except Exception as e:
 
-        bot.reply_to(
-            message,
-            "/addproduct|code|name"
+        bot.send_message(
+            chat_id,
+            f"❌ LỖI:\n{e}"
         )
 
-# =========================================================
-# ADD KEY
-# =========================================================
+# =========================================
+# AUTO CHECK PAYMENT
+# =========================================
 
-@bot.message_handler(commands=['addkey'])
-def add_key(message):
+def auto_check_payment():
 
-    if message.chat.id != ADMIN_ID:
-        return
+    while True:
 
-    try:
+        try:
 
-        split_data = message.text.split("|")
+            cursor.execute("""
+            SELECT payment_code, chat_id
+            FROM orders
+            WHERE status='pending'
+            """)
 
-        product_code = split_data[1]
+            orders = cursor.fetchall()
 
-        package = split_data[2]
+            for order in orders:
 
-        key_value = split_data[3]
+                payment_code = order[0]
 
-        cursor.execute("""
-        INSERT INTO keys_data(
-            product_code,
-            package,
-            key_value
-        )
-        VALUES (?, ?, ?)
-        """, (
-            product_code,
-            package,
-            key_value
-        ))
+                chat_id = order[1]
 
-        conn.commit()
+                check_payment(
+                    payment_code,
+                    chat_id
+                )
 
-        bot.reply_to(
-            message,
-            "✅ ĐÃ THÊM KEY"
-        )
+        except:
+            pass
 
-    except:
+        time.sleep(CHECK_TIME)
 
-        bot.reply_to(
-            message,
-            "/addkey|product|package|key"
-        )
-
-# =========================================================
+# =========================================
 # DELETE KEY
-# =========================================================
+# =========================================
 
 @bot.message_handler(commands=['delkey'])
-def delete_key(message):
+def delkey(message):
 
-    if message.chat.id != ADMIN_ID:
+    if message.from_user.id != ADMIN_ID:
         return
 
     try:
 
-        split_data = message.text.split("|")
+        split_text = message.text.split()
 
-        product_code = split_data[1]
+        product_code = split_text[1]
 
-        package = split_data[2]
+        device = split_text[2]
 
-        key_value = split_data[3]
+        version = split_text[3]
+
+        time_name = split_text[4]
+
+        key_value = split_text[5]
+
+        full_package = f"{device}_{version}_{time_name}"
 
         cursor.execute("""
         DELETE FROM keys_data
@@ -807,91 +636,47 @@ def delete_key(message):
         AND key_value=?
         """, (
             product_code,
-            package,
+            full_package,
             key_value
         ))
 
         conn.commit()
 
-        if cursor.rowcount > 0:
-
-            bot.reply_to(
-                message,
-                "✅ ĐÃ XÓA KEY"
-            )
-
-        else:
-
-            bot.reply_to(
-                message,
-                "❌ KHÔNG TÌM THẤY KEY"
-            )
-
-    except:
-
         bot.reply_to(
             message,
-            "/delkey|product|package|key"
-        )
-
-# =========================================================
-# DELETE ALL KEY
-# =========================================================
-
-@bot.message_handler(commands=['delallkey'])
-def delete_all_key(message):
-
-    if message.chat.id != ADMIN_ID:
-        return
-
-    try:
-
-        split_data = message.text.split("|")
-
-        product_code = split_data[1]
-
-        package = split_data[2]
-
-        cursor.execute("""
-        DELETE FROM keys_data
-        WHERE product_code=?
-        AND package=?
-        """, (
-            product_code,
-            package
-        ))
-
-        conn.commit()
-
-        bot.reply_to(
-            message,
-            "✅ ĐÃ XÓA TOÀN BỘ KEY"
+            "✅ ĐÃ XOÁ KEY"
         )
 
     except:
 
         bot.reply_to(
             message,
-            "/delallkey|product|package"
+            "❌ /delkey game device version time key"
         )
 
-# =========================================================
-# KEY COUNT
-# =========================================================
+# =========================================
+# COUNT KEY
+# =========================================
 
 @bot.message_handler(commands=['keycount'])
-def key_count(message):
+def keycount(message):
 
-    if message.chat.id != ADMIN_ID:
+    if message.from_user.id != ADMIN_ID:
         return
 
     try:
 
-        split_data = message.text.split("|")
+        split_text = message.text.split()
 
-        product_code = split_data[1]
+        product_code = split_text[1]
 
-        package = split_data[2]
+        device = split_text[2]
+
+        version = split_text[3]
+
+        time_name = split_text[4]
+
+        full_package = f"{device}_{version}_{time_name}"
 
         cursor.execute("""
         SELECT COUNT(*)
@@ -900,7 +685,7 @@ def key_count(message):
         AND package=?
         """, (
             product_code,
-            package
+            full_package
         ))
 
         count = cursor.fetchone()[0]
@@ -914,94 +699,24 @@ def key_count(message):
 
         bot.reply_to(
             message,
-            "/keycount|product|package"
+            "❌ /keycount game device version time"
         )
 
-# =========================================================
-# FLASK
-# =========================================================
+# =========================================
+# GET ID
+# =========================================
 
-@app.route("/")
-def home():
-    return "BOT ONLINE"
+@bot.message_handler(commands=['id'])
+def getid(message):
 
-# =========================================================
-# AUTO CHECK PAYMENT
-# =========================================================
+    bot.reply_to(
+        message,
+        f"🆔 ID: {message.chat.id}"
+    )
 
-def auto_check_payment():
-
-    while True:
-
-        try:
-
-            headers = {
-                "Authorization": f"Bearer {SEPAY_API_KEY}"
-            }
-
-            response = requests.get(
-                "https://my.sepay.vn/userapi/transactions/list?limit=20",
-                headers=headers,
-                timeout=20
-            )
-
-            if response.status_code == 200:
-
-                data_json = response.json()
-
-                transactions = data_json.get(
-                    "transactions",
-                    []
-                )
-
-                cursor.execute("""
-                SELECT payment_code, amount
-                FROM orders
-                WHERE status='pending'
-                """)
-
-                orders = cursor.fetchall()
-
-                for order in orders:
-
-                    payment_code = order[0]
-
-                    order_amount = order[1]
-
-                    for trans in transactions:
-
-                        content = str(
-                            trans.get(
-                                "transaction_content",
-                                ""
-                            )
-                        )
-
-                        amount_in = int(
-                            trans.get(
-                                "amount_in",
-                                0
-                            )
-                        )
-
-                        if (
-                            payment_code in content
-                            and amount_in >= order_amount
-                        ):
-
-                            payment_success(
-                                payment_code
-                            )
-
-        except Exception as e:
-
-            print(e)
-
-        time.sleep(CHECK_TIME)
-
-# =========================================================
-# RUN
-# =========================================================
+# =========================================
+# RUN BOT
+# =========================================
 
 threading.Thread(
     target=lambda: bot.infinity_polling(
@@ -1012,6 +727,14 @@ threading.Thread(
 threading.Thread(
     target=auto_check_payment
 ).start()
+
+# =========================================
+# FLASK
+# =========================================
+
+@app.route("/")
+def home():
+    return "BOT ONLINE"
 
 PORT = int(
     os.environ.get(
