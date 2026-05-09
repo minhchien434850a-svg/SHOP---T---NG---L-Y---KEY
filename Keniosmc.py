@@ -142,7 +142,9 @@ def callback(call):
 
     data = call.data
 
+    # =====================================
     # PRODUCT
+    # =====================================
 
     if data.startswith("product_"):
 
@@ -161,6 +163,14 @@ def callback(call):
 
         packages = cursor.fetchall()
 
+        if not packages:
+
+            bot.send_message(
+                call.message.chat.id,
+                "❌ CHƯA CÓ GÓI"
+            )
+            return
+
         for package_data in packages:
 
             package = package_data[0]
@@ -170,7 +180,7 @@ def callback(call):
             markup.row(
                 InlineKeyboardButton(
                     f"{package.upper()} - {price:,}đ",
-                    callback_data=f"buy_{product_code}_{package}"
+                    callback_data=f"buy|{product_code}|{package}"
                 )
             )
 
@@ -180,11 +190,13 @@ def callback(call):
             reply_markup=markup
         )
 
+    # =====================================
     # BUY
+    # =====================================
 
-    elif data.startswith("buy_"):
+    elif data.startswith("buy|"):
 
-        split_data = data.split("_")
+        split_data = data.split("|")
 
         product_code = split_data[1]
 
@@ -243,9 +255,9 @@ def callback(call):
             headers=headers
         )
 
-        data = response.json()
+        data_json = response.json()
 
-        bank = data["data"][0]
+        bank = data_json["data"][0]
 
         bank_name = bank["bank_name"]
 
