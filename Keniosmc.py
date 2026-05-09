@@ -18,6 +18,16 @@ SEPAY_API_KEY = "UMRLQBWEP5ZMBIJDTWR0KUCFRLUMFXGWGZUSIP9DVND3LJCP6SZ2DESJY19HVTA
 
 ADMIN_ID = 8126773907
 
+BANK_NAME = "MSB"
+
+BANK_NUMBER = "80003122324"
+
+BANK_OWNER = "TRAN MINH CHIEN"
+
+# =========================================
+# BOT
+# =========================================
+
 bot = TeleBot(BOT_TOKEN)
 
 app = Flask(__name__)
@@ -50,16 +60,6 @@ CREATE TABLE IF NOT EXISTS prices(
     product_code TEXT,
     package TEXT,
     price INTEGER
-)
-""")
-
-# PACKAGE LINKS
-
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS package_links(
-    product_code TEXT,
-    package TEXT,
-    link TEXT
 )
 """)
 
@@ -125,9 +125,9 @@ def start(message):
         """
 🎮 SHOP TOOL ONLINE
 
-📥 BOT TỰ ĐỘNG
-💰 THANH TOÁN SEPAY
-🔑 TỰ ĐỘNG GIAO KEY
+💰 THANH TOÁN TỰ ĐỘNG
+🔑 GIAO KEY TỰ ĐỘNG
+📱 IOS / ANDROID
 """,
         reply_markup=markup
     )
@@ -141,9 +141,9 @@ def callback(call):
 
     data = call.data
 
-    # =====================================
-    # PRODUCT
-    # =====================================
+    # ====================================
+    # CHỌN GAME
+    # ====================================
 
     if data.startswith("product_"):
 
@@ -154,47 +154,127 @@ def callback(call):
 
         markup = InlineKeyboardMarkup()
 
-        cursor.execute("""
-        SELECT package, price
-        FROM prices
-        WHERE product_code=?
-        """, (product_code,))
+        markup.row(
 
-        packages = cursor.fetchall()
+            InlineKeyboardButton(
+                "🍎 IOS",
+                callback_data=f"device_{product_code}_ios"
+            ),
 
-        if not packages:
-
-            bot.answer_callback_query(
-                call.id,
-                "❌ CHƯA CÓ GÓI"
+            InlineKeyboardButton(
+                "🤖 ANDROID",
+                callback_data=f"device_{product_code}_android"
             )
-            return
+        )
 
-        for package_data in packages:
-
-            package = package_data[0]
-
-            price = package_data[1]
-
-            markup.row(
-                InlineKeyboardButton(
-                    f"{package.upper()} - {price:,}đ",
-                    callback_data=f"buy_{product_code}_{package}"
-                )
-            )
-
-        # FIX IPHONE BUTTON
-
-        bot.edit_message_text(
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            text="📦 CHỌN GÓI",
+        bot.send_message(
+            call.message.chat.id,
+            "📱 CHỌN HỆ ĐIỀU HÀNH",
             reply_markup=markup
         )
 
-        # =====================================
-    # BUY
-    # =====================================
+    # ====================================
+    # CHỌN IOS / ANDROID
+    # ====================================
+
+    elif data.startswith("device_"):
+
+        split_data = data.split("_")
+
+        product_code = split_data[1]
+
+        device = split_data[2]
+
+        markup = InlineKeyboardMarkup()
+
+        versions = [
+            "vingold",
+            "vipred",
+            "lite"
+        ]
+
+        for version in versions:
+
+            markup.row(
+                InlineKeyboardButton(
+                    version.upper(),
+                    callback_data=f"version_{product_code}_{device}_{version}"
+                )
+            )
+
+        bot.send_message(
+            call.message.chat.id,
+            f"""
+🎮 {product_code.upper()}
+
+📱 {device.upper()}
+
+📦 CHỌN PHIÊN BẢN
+""",
+            reply_markup=markup
+        )
+
+    # ====================================
+    # CHỌN PHIÊN BẢN
+    # ====================================
+
+    elif data.startswith("version_"):
+
+        split_data = data.split("_")
+
+        product_code = split_data[1]
+
+        device = split_data[2]
+
+        version = split_data[3]
+
+        markup = InlineKeyboardMarkup()
+
+        markup.row(
+            InlineKeyboardButton(
+                "⏰ GIỜ",
+                callback_data=f"buy_{product_code}_{device}_{version}_gio"
+            )
+        )
+
+        markup.row(
+            InlineKeyboardButton(
+                "📅 NGÀY",
+                callback_data=f"buy_{product_code}_{device}_{version}_ngay"
+            )
+        )
+
+        markup.row(
+            InlineKeyboardButton(
+                "🗓 TUẦN",
+                callback_data=f"buy_{product_code}_{device}_{version}_tuan"
+            )
+        )
+
+        markup.row(
+            InlineKeyboardButton(
+                "📦 THÁNG",
+                callback_data=f"buy_{product_code}_{device}_{version}_thang"
+            )
+        )
+
+        bot.send_message(
+            call.message.chat.id,
+            f"""
+🎮 {product_code.upper()}
+
+📱 {device.upper()}
+
+📦 {version.upper()}
+
+⏰ CHỌN THỜI GIAN
+""",
+            reply_markup=markup
+        )
+
+    # ====================================
+    # MUA
+    # ====================================
 
     elif data.startswith("buy_"):
 
@@ -202,7 +282,13 @@ def callback(call):
 
         product_code = split_data[1]
 
-        package = split_data[2]
+        device = split_data[2]
+
+        version = split_data[3]
+
+        package = split_data[4]
+
+        full_package = f"{device}_{version}_{package}"
 
         cursor.execute("""
         SELECT price
@@ -211,7 +297,7 @@ def callback(call):
         AND package=?
         """, (
             product_code,
-            package
+            full_package
         ))
 
         result = cursor.fetchone()
@@ -220,7 +306,7 @@ def callback(call):
 
             bot.send_message(
                 call.message.chat.id,
-                "❌ CHƯA CÓ GIÁ"
+                "❌ CHƯA CÓ GÓI"
             )
 
             return
@@ -241,67 +327,172 @@ def callback(call):
             payment_code,
             str(call.message.chat.id),
             product_code,
-            package,
+            full_package,
             amount,
             "pending"
         ))
 
         conn.commit()
 
-        # =========================
-        # THÔNG TIN NGÂN HÀNG
-        # =========================
-
-        bank_name = "MSB"
-
-        account_number = "80003122324"
-
-        account_holder = "TRAN MINH CHIEN"
-
-        # =========================
-        # QR CODE
-        # =========================
-
-        qr_url = f"https://qr.sepay.vn/img?acc={account_number}&bank=MSB&amount={amount}&des={payment_code}"
-
-        # =========================
-        # TEXT
-        # =========================
+        qr_url = f"https://img.vietqr.io/image/{BANK_NAME}-{BANK_NUMBER}-compact2.png?amount={amount}&addInfo={payment_code}&accountName={BANK_OWNER}"
 
         text = f"""
-💰 SẢN PHẨM:
+🎮 GAME:
 {product_code.upper()}
 
-📦 GÓI:
+📱 HỆ:
+{device.upper()}
+
+📦 PHIÊN BẢN:
+{version.upper()}
+
+⏰ GÓI:
 {package.upper()}
 
 💵 GIÁ:
 {amount:,}đ
 
-🏦 NGÂN HÀNG:
-{bank_name}
-
-👤 CHỦ TK:
-{account_holder}
+🏦 BANK:
+{BANK_NAME}
 
 💳 STK:
-{account_number}
+{BANK_NUMBER}
+
+👤 CHỦ TK:
+{BANK_OWNER}
 
 📌 NỘI DUNG:
 {payment_code}
-
-⚠️ QUÉT QR ĐỂ THANH TOÁN
 """
 
-        # =========================
-        # GỬI QR
-        # =========================
+        markup = InlineKeyboardMarkup()
+
+        markup.row(
+            InlineKeyboardButton(
+                "🧾 KIỂM TRA THANH TOÁN",
+                callback_data=f"check_{payment_code}"
+            )
+        )
+
+        markup.row(
+            InlineKeyboardButton(
+                "🔄 RESET QR",
+                callback_data=f"buy_{product_code}_{device}_{version}_{package}"
+            )
+        )
 
         bot.send_photo(
             call.message.chat.id,
             qr_url,
-            caption=text
+            caption=text,
+            reply_markup=markup
         )
+
+    # ====================================
+    # CHECK THANH TOÁN
+    # ====================================
+
+    elif data.startswith("check_"):
+
+        payment_code = data.replace(
+            "check_",
+            ""
+        )
+
+        headers = {
+            "Authorization": f"Bearer {SEPAY_API_KEY}"
+        }
+
+        response = requests.get(
+            "https://my.sepay.vn/userapi/transactions/list",
+            headers=headers
+        )
+
+        data_json = response.json()
+
+        found = False
+
+        for trans in data_json["data"]:
+
+            content = str(
+                trans.get(
+                    "transaction_content",
+                    ""
+                )
+            )
+
+            if payment_code in content:
+
+                found = True
+
+                cursor.execute("""
+                SELECT *
+                FROM orders
+                WHERE payment_code=?
+                """, (payment_code,))
+
+                order = cursor.fetchone()
+
+                if not order:
+                    return
+
+                product_code = order[2]
+
+                package = order[3]
+
+                cursor.execute("""
+                SELECT id, key_value
+                FROM keys_data
+                WHERE product_code=?
+                AND package=?
+                AND sold=0
+                LIMIT 1
+                """, (
+                    product_code,
+                    package
+                ))
+
+                key_data = cursor.fetchone()
+
+                if not key_data:
+
+                    bot.send_message(
+                        call.message.chat.id,
+                        "❌ HẾT KEY"
+                    )
+
+                    return
+
+                key_id = key_data[0]
+
+                key_value = key_data[1]
+
+                cursor.execute("""
+                UPDATE keys_data
+                SET sold=1
+                WHERE id=?
+                """, (key_id,))
+
+                conn.commit()
+
+                bot.send_message(
+                    call.message.chat.id,
+                    f"""
+✅ THANH TOÁN THÀNH CÔNG
+
+🔑 KEY:
+{key_value}
+"""
+                )
+
+                return
+
+        if not found:
+
+            bot.send_message(
+                call.message.chat.id,
+                "❌ CHƯA THANH TOÁN"
+            )
 
 # =========================================
 # ADD PRODUCT
@@ -334,14 +525,14 @@ def addproduct(message):
 
         bot.reply_to(
             message,
-            "✅ ĐÃ THÊM SẢN PHẨM"
+            "✅ ĐÃ THÊM GAME"
         )
 
     except:
 
         bot.reply_to(
             message,
-            "❌ Dùng:\n/addproduct code ten"
+            "❌ /addproduct code ten"
         )
 
 # =========================================
@@ -377,14 +568,14 @@ def addpackage(message):
 
         bot.reply_to(
             message,
-            f"✅ ĐÃ THÊM GÓI {package}"
+            "✅ ĐÃ THÊM GÓI"
         )
 
     except:
 
         bot.reply_to(
             message,
-            "❌ Dùng:\n/addpackage code goi gia"
+            "❌ /addpackage game goi gia"
         )
 
 # =========================================
@@ -429,123 +620,7 @@ def changeprice(message):
 
         bot.reply_to(
             message,
-            "❌ Dùng:\n/changeprice code goi gia"
-        )
-
-# =========================================
-# SET LINK
-# =========================================
-
-@bot.message_handler(commands=['setlink'])
-def setlink(message):
-
-    if message.from_user.id != ADMIN_ID:
-        return
-
-    try:
-
-        split_text = message.text.split()
-
-        product_code = split_text[1]
-
-        package = split_text[2]
-
-        link = split_text[3]
-
-        cursor.execute("""
-        DELETE FROM package_links
-        WHERE product_code=?
-        AND package=?
-        """, (
-            product_code,
-            package
-        ))
-
-        cursor.execute("""
-        INSERT INTO package_links
-        VALUES (?, ?, ?)
-        """, (
-            product_code,
-            package,
-            link
-        ))
-
-        conn.commit()
-
-        bot.reply_to(
-            message,
-            "✅ ĐÃ THÊM LINK"
-        )
-
-    except:
-
-        bot.reply_to(
-            message,
-            "❌ Dùng:\n/setlink code goi link"
-        )
-
-# =========================================
-# GET LINK
-# =========================================
-
-@bot.message_handler(commands=['getlink'])
-def getlink(message):
-
-    try:
-
-        split_text = message.text.split()
-
-        product_code = split_text[1]
-
-        package = split_text[2]
-
-        cursor.execute("""
-        SELECT link
-        FROM package_links
-        WHERE product_code=?
-        AND package=?
-        """, (
-            product_code,
-            package
-        ))
-
-        result = cursor.fetchone()
-
-        if not result:
-
-            bot.reply_to(
-                message,
-                "❌ KHÔNG CÓ LINK"
-            )
-
-            return
-
-        link = result[0]
-
-        markup = InlineKeyboardMarkup()
-
-        markup.add(
-            InlineKeyboardButton(
-                "📥 TẢI NGAY",
-                url=link
-            )
-        )
-
-        bot.send_message(
-            message.chat.id,
-            f"""
-📦 {package.upper()}
-
-🔗 {link}
-""",
-            reply_markup=markup
-        )
-
-    except:
-
-        bot.reply_to(
-            message,
-            "❌ Dùng:\n/getlink code goi"
+            "❌ /changeprice game goi gia"
         )
 
 # =========================================
@@ -592,7 +667,83 @@ def addkey(message):
 
         bot.reply_to(
             message,
-            "❌ Dùng:\n/addkey code goi key"
+            "❌ /addkey game goi key"
+        )
+
+# =========================================
+# DELETE PRODUCT
+# =========================================
+
+@bot.message_handler(commands=['delproduct'])
+def delproduct(message):
+
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    try:
+
+        split_text = message.text.split()
+
+        product_code = split_text[1]
+
+        cursor.execute("""
+        DELETE FROM products
+        WHERE product_code=?
+        """, (product_code,))
+
+        conn.commit()
+
+        bot.reply_to(
+            message,
+            "✅ ĐÃ XOÁ GAME"
+        )
+
+    except:
+
+        bot.reply_to(
+            message,
+            "❌ /delproduct game"
+        )
+
+# =========================================
+# DELETE PACKAGE
+# =========================================
+
+@bot.message_handler(commands=['delpackage'])
+def delpackage(message):
+
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    try:
+
+        split_text = message.text.split()
+
+        product_code = split_text[1]
+
+        package = split_text[2]
+
+        cursor.execute("""
+        DELETE FROM prices
+        WHERE product_code=?
+        AND package=?
+        """, (
+            product_code,
+            package
+        ))
+
+        conn.commit()
+
+        bot.reply_to(
+            message,
+            "✅ ĐÃ XOÁ GÓI"
+        )
+
+    except:
+
+        bot.reply_to(
+            message,
+            "❌ /delpackage game goi"
         )
 
 # =========================================
@@ -637,7 +788,127 @@ def delkey(message):
 
         bot.reply_to(
             message,
-            "❌ Dùng:\n/delkey code goi key"
+            "❌ /delkey game goi key"
+        )
+
+# =========================================
+# CHANGE VERSION
+# =========================================
+
+@bot.message_handler(commands=['changeversion'])
+def changeversion(message):
+
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    try:
+
+        split_text = message.text.split()
+
+        old_version = split_text[1]
+
+        new_version = split_text[2]
+
+        cursor.execute("""
+        UPDATE prices
+        SET package = REPLACE(
+            package,
+            ?,
+            ?
+        )
+        WHERE package LIKE ?
+        """, (
+            old_version,
+            new_version,
+            f"%{old_version}%"
+        ))
+
+        cursor.execute("""
+        UPDATE keys_data
+        SET package = REPLACE(
+            package,
+            ?,
+            ?
+        )
+        WHERE package LIKE ?
+        """, (
+            old_version,
+            new_version,
+            f"%{old_version}%"
+        ))
+
+        conn.commit()
+
+        bot.reply_to(
+            message,
+            "✅ ĐÃ ĐỔI PHIÊN BẢN"
+        )
+
+    except:
+
+        bot.reply_to(
+            message,
+            "❌ /changeversion old new"
+        )
+
+# =========================================
+# CHANGE TIME
+# =========================================
+
+@bot.message_handler(commands=['changetime'])
+def changetime(message):
+
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    try:
+
+        split_text = message.text.split()
+
+        old_time = split_text[1]
+
+        new_time = split_text[2]
+
+        cursor.execute("""
+        UPDATE prices
+        SET package = REPLACE(
+            package,
+            ?,
+            ?
+        )
+        WHERE package LIKE ?
+        """, (
+            old_time,
+            new_time,
+            f"%{old_time}%"
+        ))
+
+        cursor.execute("""
+        UPDATE keys_data
+        SET package = REPLACE(
+            package,
+            ?,
+            ?
+        )
+        WHERE package LIKE ?
+        """, (
+            old_time,
+            new_time,
+            f"%{old_time}%"
+        ))
+
+        conn.commit()
+
+        bot.reply_to(
+            message,
+            "✅ ĐÃ ĐỔI THỜI GIAN"
+        )
+
+    except:
+
+        bot.reply_to(
+            message,
+            "❌ /changetime old new"
         )
 
 # =========================================
