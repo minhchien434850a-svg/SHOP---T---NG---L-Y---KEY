@@ -912,7 +912,119 @@ def delversion(message):
             message,
             f"❌ LỖI:\n{e}"
         )
+        
+# =========================================
+# DELETE KEY
+# =========================================
 
+@bot.message_handler(commands=['delkey'])
+def delkey(message):
+
+    # CHECK ADMIN
+
+    if message.from_user.id != ADMIN_ID:
+
+        bot.reply_to(
+            message,
+            "❌ KHÔNG CÓ QUYỀN"
+        )
+
+        return
+
+    try:
+
+        split_text = message.text.split()
+
+        # /delkey pubg ios vipgold thang VIP123
+
+        product_code = split_text[1]
+
+        device = split_text[2]
+
+        version = split_text[3]
+
+        time_name = split_text[4]
+
+        key_value = split_text[5]
+
+        # PACKAGE
+
+        full_package = f"{device}_{version}_{time_name}"
+
+        # CHECK KEY
+
+        cursor.execute("""
+        SELECT *
+        FROM keys_data
+        WHERE product_code=?
+        AND package=?
+        AND key_value=?
+        """, (
+            product_code,
+            full_package,
+            key_value
+        ))
+
+        result = cursor.fetchone()
+
+        # NOT FOUND
+
+        if not result:
+
+            bot.reply_to(
+                message,
+                "❌ KHÔNG TÌM THẤY KEY"
+            )
+
+            return
+
+        # DELETE KEY
+
+        cursor.execute("""
+        DELETE FROM keys_data
+        WHERE product_code=?
+        AND package=?
+        AND key_value=?
+        """, (
+            product_code,
+            full_package,
+            key_value
+        ))
+
+        conn.commit()
+
+        bot.reply_to(
+            message,
+            f"""
+✅ ĐÃ XOÁ KEY
+
+🎮 GAME:
+{product_code}
+
+📱 HỆ:
+{device}
+
+📦 GÓI:
+{version}
+
+⏰ THỜI GIAN:
+{time_name}
+
+🔑 KEY:
+{key_value}
+"""
+        )
+
+    except Exception as e:
+
+        bot.reply_to(
+            message,
+            f"""
+❌ LỖI XOÁ KEY
+
+{e}
+"""
+        )
 # =========================================
 # RUN BOT
 # =========================================
