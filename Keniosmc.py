@@ -7,7 +7,6 @@ import requests
 import threading
 import random
 import string
-import time
 
 # =========================================
 # CONFIG
@@ -165,8 +164,8 @@ def callback(call):
 
         if not packages:
 
-            bot.send_message(
-                call.message.chat.id,
+            bot.answer_callback_query(
+                call.id,
                 "❌ CHƯA CÓ GÓI"
             )
             return
@@ -180,13 +179,16 @@ def callback(call):
             markup.row(
                 InlineKeyboardButton(
                     f"{package.upper()} - {price:,}đ",
-                    callback_data=f"buy|{product_code}|{package}"
+                    callback_data=f"buy_{product_code}_{package}"
                 )
             )
 
-        bot.send_message(
-            call.message.chat.id,
-            "📦 CHỌN GÓI",
+        # FIX IPHONE BUTTON
+
+        bot.edit_message_text(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            text="📦 CHỌN GÓI",
             reply_markup=markup
         )
 
@@ -194,9 +196,9 @@ def callback(call):
     # BUY
     # =====================================
 
-    elif data.startswith("buy|"):
+    elif data.startswith("buy_"):
 
-        split_data = data.split("|")
+        split_data = data.split("_")
 
         product_code = split_data[1]
 
@@ -255,9 +257,9 @@ def callback(call):
             headers=headers
         )
 
-        data_json = response.json()
+        data_bank = response.json()
 
-        bank = data_json["data"][0]
+        bank = data_bank["data"][0]
 
         bank_name = bank["bank_name"]
 
