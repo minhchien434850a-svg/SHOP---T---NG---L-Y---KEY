@@ -395,29 +395,45 @@ def callback(call):
             reply_markup=markup
         )
 
-    # CHECK PAYMENT
+# =========================================
+# CHECK PAYMENT
+# =========================================
 
-    elif data.startswith("check_"):
+elif data.startswith("check_"):
 
-        payment_code = data.replace(
-            "check_",
-            ""
-        )
+    payment_code = data.replace(
+        "check_",
+        ""
+    )
 
-        headers = {
-            "Authorization": f"Bearer {SEPAY_API_KEY}"
-        }
+    headers = {
+        "Authorization": f"Bearer {SEPAY_API_KEY}"
+    }
+
+    try:
 
         response = requests.get(
             "https://my.sepay.vn/userapi/transactions/list",
-            headers=headers
+            headers=headers,
+            timeout=30
         )
+
+        print(response.text)
 
         data_json = response.json()
 
         found = False
 
-        for trans in data_json["data"]:
+        transactions = data_json.get("transactions", [])
+
+        # Nếu transactions rỗng
+        # thử data
+
+        if not transactions:
+
+            transactions = data_json.get("data", [])
+
+        for trans in transactions:
 
             content = str(
                 trans.get(
@@ -425,6 +441,8 @@ def callback(call):
                     ""
                 )
             )
+
+            print(content)
 
             if payment_code in content:
 
@@ -439,6 +457,12 @@ def callback(call):
                 order = cursor.fetchone()
 
                 if not order:
+
+                    bot.answer_callback_query(
+                        call.id,
+                        "❌ KHÔNG TÌM THẤY ĐƠN"
+                    )
+
                     return
 
                 product_code = order[2]
@@ -473,7 +497,7 @@ def callback(call):
 
                 key_value = key_data[1]
 
-                # DELETE SOLD KEY
+                # XOÁ KEY ĐÃ BÁN
 
                 cursor.execute("""
                 DELETE FROM keys_data
@@ -499,7 +523,13 @@ def callback(call):
                 download_link = "Không có link"
 
                 if link_data:
+
                     download_link = link_data[0]
+
+                bot.answer_callback_query(
+                    call.id,
+                    "✅ THANH TOÁN THÀNH CÔNG"
+                )
 
                 bot.send_message(
                     call.message.chat.id,
@@ -509,7 +539,7 @@ def callback(call):
 🔑 KEY:
 {key_value}
 
-🔗 LINK TẢI:
+🔗 LINK:
 {download_link}
 """
                 )
@@ -518,10 +548,19 @@ def callback(call):
 
         if not found:
 
-            bot.send_message(
-                call.message.chat.id,
+            bot.answer_callback_query(
+                call.id,
                 "❌ CHƯA THANH TOÁN"
             )
+
+    except Exception as e:
+
+        print(e)
+
+        bot.answer_callback_query(
+            call.id,
+            f"LỖI: {e}"
+        )
 
 # =========================================
 # ADD PRODUCT
