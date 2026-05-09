@@ -769,36 +769,62 @@ def delversion(message):
 
         split_text = message.text.split()
 
-        version = split_text[1]
+        version = split_text[1].lower()
+
+        # =====================================
+        # XOÁ TRONG versions
+        # =====================================
 
         cursor.execute("""
         DELETE FROM versions
-        WHERE version=?
+        WHERE LOWER(version)=?
         """, (version,))
+
+        # =====================================
+        # XOÁ TRONG prices
+        # =====================================
 
         cursor.execute("""
         DELETE FROM prices
-        WHERE package LIKE ?
+        WHERE LOWER(package) LIKE ?
         """, (
-            f"%{version}%",
+            f"%_{version}_%",
         ))
+
+        # =====================================
+        # XOÁ TRONG keys_data
+        # =====================================
 
         cursor.execute("""
         DELETE FROM keys_data
-        WHERE package LIKE ?
+        WHERE LOWER(package) LIKE ?
         """, (
-            f"%{version}%",
+            f"%_{version}_%",
+        ))
+
+        # =====================================
+        # XOÁ TRONG orders
+        # =====================================
+
+        cursor.execute("""
+        DELETE FROM orders
+        WHERE LOWER(package) LIKE ?
+        """, (
+            f"%_{version}_%",
         ))
 
         conn.commit()
 
-        bot.reply_to(message, "✅ ĐÃ XOÁ GÓI")
+        bot.reply_to(
+            message,
+            f"✅ ĐÃ XOÁ GÓI: {version}"
+        )
 
-    except:
+    except Exception as e:
 
         bot.reply_to(
             message,
-            "❌ /delversion version"
+            f"❌ LỖI:\n{e}"
         )
 
 # =========================================
